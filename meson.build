@@ -1,6 +1,6 @@
 project(
   'polkit', ['c', 'cpp'],
-  version: '0.200',
+  version: '0.119',
   license: 'LGPL2+',
   default_options: [
     'buildtype=debugoptimized',
@@ -126,7 +126,13 @@ expat_dep = dependency('expat')
 assert(cc.has_header('expat.h', dependencies: expat_dep), 'Can\'t find expat.h. Please install expat.')
 assert(cc.has_function('XML_ParserCreate', dependencies: expat_dep), 'Can\'t find expat library. Please install expat.')
 
-mozjs_dep = dependency('mozjs-78')
+js_engine = get_option('js_engine')
+if js_engine == 'duktape'
+  js_dep = cc.find_library('duktape')
+  libm_dep = cc.find_library('m')
+elif js_engine == 'mozjs'
+  js_dep = dependency('mozjs-78')
+endif
 
 dbus_dep = dependency('dbus-1')
 dbus_confdir = dbus_dep.get_pkgconfig_variable('datadir', define_variable: ['datadir', pk_prefix / pk_datadir])   #changed from sysconfdir with respect to commit#8eada3836465838
@@ -350,6 +356,9 @@ if enable_logind
   output += '        systemdsystemunitdir:     ' + systemd_systemdsystemunitdir + '\n'
 endif
 output += '        polkitd user:             ' + polkitd_user + ' \n'
+output += '        Javascript engine:        ' + js_engine + '\n'
+if enable_logind
+endif
 output += '        PAM support:              ' + enable_pam.to_string() + '\n\n'
 if enable_pam
   output += '        PAM file auth:            ' + pam_conf['PAM_FILE_INCLUDE_AUTH'] + '\n'
