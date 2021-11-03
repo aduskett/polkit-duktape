@@ -1,4 +1,4 @@
-service_conf = {'libprivdir': pk_prefix / pk_pkglibdir}
+service_conf = {'libprivdir': pk_prefix / pk_libprivdir}
 
 configure_file(
   input: 'org.freedesktop.PolicyKit1.service.in',
@@ -25,16 +25,6 @@ if enable_pam
     install_dir: pk_sysconfdir / 'pam.d',
   )
 endif
-
-its_data = files(
-  'polkit.its',
-  'polkit.loc',
-)
-
-install_data(
-  its_data,
-  install_dir: pk_datadir / 'gettext/its',
-)
 
 if enable_logind
   configure_file(

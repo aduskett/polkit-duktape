@@ -1,6 +1,6 @@
 project(
   'polkit', ['c', 'cpp'],
-  version: '0.200',
+  version: '0.120',
   license: 'LGPL2+',
   default_options: [
     'buildtype=debugoptimized',
@@ -27,7 +27,8 @@ pk_sysconfdir = get_option('sysconfdir')
 
 pk_pkgdatadir = pk_datadir / pk_api_name
 pk_pkgincludedir = pk_includedir / pk_api_name
-pk_pkglibdir = pk_libdir / pk_api_name
+# note that this is always 'lib', not lib64 or lib/x86_64-linux-gnu
+pk_libprivdir = 'lib' / pk_api_name
 pk_pkgsysconfdir = pk_sysconfdir / pk_api_name
 
 pk_actiondir = pk_api_name / 'actions'
@@ -46,12 +47,18 @@ source_root = meson.current_source_dir()
 build_root = meson.current_build_dir()
 
 data_dir = source_root / 'data'
+its_dir = source_root / 'gettext'
 po_dir = source_root / 'po'
 
-intltool_merge = find_program('intltool-merge')
-intltool_cache = po_dir / '.intltool-merge-cache'
-intltool_desktop_cmd = [intltool_merge, '-d', '-u', '-c', intltool_cache, po_dir, '@INPUT@', '@OUTPUT@']
-intltool_xml_cmd = [intltool_merge, '-x', '-u', '-c', intltool_cache, po_dir, '@INPUT@', '@OUTPUT@']
+its_data = files(
+  'gettext/its/polkit.its',
+  'gettext/its/polkit.loc',
+)
+
+install_data(
+  its_data,
+  install_dir: pk_datadir / 'gettext/its',
+)
 
 top_inc = include_directories('.')
 
@@ -126,12 +133,22 @@ expat_dep = dependency('expat')
 assert(cc.has_header('expat.h', dependencies: expat_dep), 'Can\'t find expat.h. Please install expat.')
 assert(cc.has_function('XML_ParserCreate', dependencies: expat_dep), 'Can\'t find expat library. Please install expat.')
 
-mozjs_dep = dependency('mozjs-78')
+js_engine = get_option('js_engine')
+if js_engine == 'duktape'
+  js_dep = cc.find_library('duktape')
+  libm_dep = cc.find_library('m')
+elif js_engine == 'mozjs'
+  js_dep = dependency('mozjs-78')
+endif
 
-dbus_dep = dependency('dbus-1')
-dbus_confdir = dbus_dep.get_pkgconfig_variable('datadir', define_variable: ['datadir', pk_prefix / pk_datadir])   #changed from sysconfdir with respect to commit#8eada3836465838
-dbus_policydir = dbus_confdir / 'dbus-1/system.d'
+dbus_dep = dependency('dbus-1', required: false)
+dbus_policydir = pk_prefix / pk_datadir / 'dbus-1/system.d'
+if dbus_dep.found()
 dbus_system_bus_services_dir = dbus_dep.get_pkgconfig_variable('system_bus_services_dir', define_variable: ['datadir', pk_prefix / pk_datadir])
+else
+  # libdbus development files not installed, assume a standard layout
+  dbus_system_bus_services_dir = pk_prefix / pk_datadir / 'dbus-1' / 'system-services'
+endif
 
 # check OS
 host_system = host_machine.system()
@@ -324,7 +341,7 @@ meson.add_install_script(
   'meson_post_install.py',
   get_option('bindir'),
   pk_pkgdatadir,
-  pk_pkglibdir,
+  pk_libprivdir,
   pk_pkgsysconfdir,
   polkitd_user,
 )
@@ -350,6 +367,7 @@ if enable_logind
   output += '        systemdsystemunitdir:     ' + systemd_systemdsystemunitdir + '\n'
 endif
 output += '        polkitd user:             ' + polkitd_user + ' \n'
+output += '        Javascript engine:        ' + js_engine + '\n'
 output += '        PAM support:              ' + enable_pam.to_string() + '\n\n'
 if enable_pam
   output += '        PAM file auth:            ' + pam_conf['PAM_FILE_INCLUDE_AUTH'] + '\n'

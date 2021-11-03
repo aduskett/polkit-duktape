@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59c)
-AC_INIT([polkit], [0.200], [http://lists.freedesktop.org/mailman/listinfo/polkit-devel], , [http://www.freedesktop.org/wiki/Software/polkit])
+AC_INIT([polkit], [0.120], [http://lists.freedesktop.org/mailman/listinfo/polkit-devel], , [http://www.freedesktop.org/wiki/Software/polkit])
 AM_INIT_AUTOMAKE([])
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_MACRO_DIR([buildutil])
@@ -80,11 +80,22 @@ PKG_CHECK_MODULES(GLIB, [gmodule-2.0 gio-unix-2.0 >= 2.30.0])
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
 
+dnl ---------------------------------------------------------------------------
+dnl - Check javascript backend
+dnl ---------------------------------------------------------------------------
+AC_ARG_WITH(duktape, AS_HELP_STRING([--with-duktape],[Use Duktape as javascript backend]),with_duktape=yes,with_duktape=no)
+AS_IF([test x${with_duktape} == xyes], [
+  PKG_CHECK_MODULES(LIBJS, [duktape >= 2.0.0 ])
+  AC_SUBST(LIBJS_CFLAGS)
+  AC_SUBST(LIBJS_LIBS)
+], [
 PKG_CHECK_MODULES(LIBJS, [mozjs-78])
 
 AC_SUBST(LIBJS_CFLAGS)
 AC_SUBST(LIBJS_CXXFLAGS)
 AC_SUBST(LIBJS_LIBS)
+])
+AM_CONDITIONAL(USE_DUKTAPE, [test x$with_duktape == xyes], [Using duktape as javascript engine library])
 
 EXPAT_LIB=""
 AC_ARG_WITH(expat, [  --with-expat=<dir>      Use expat from here],
@@ -519,11 +530,13 @@ AM_CONDITIONAL(BUILD_EXAMPLES, test "x$enable_examples" = "xyes")
 # Internationalization
 # ********************
 
-IT_PROG_INTLTOOL([0.40.0])
+AM_GNU_GETTEXT([external])
+AM_GNU_GETTEXT_VERSION([0.19.8])
+AM_GNU_GETTEXT_REQUIRE_VERSION([0.19.8])
+
 GETTEXT_PACKAGE=polkit-1
-AC_SUBST([GETTEXT_PACKAGE])
-AM_GLIB_GNU_GETTEXT
-AC_DEFINE_UNQUOTED([GETTEXT_PACKAGE],["$GETTEXT_PACKAGE"],[gettext domain])
+AC_SUBST(GETTEXT_PACKAGE)
+AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE",[gettext domain])
 
 AC_ARG_VAR([SUID_CFLAGS],
            [CFLAGS used for binaries which are usually with the suid bit])
@@ -537,6 +550,8 @@ data/Makefile
 data/polkit-1
 data/polkit-gobject-1.pc
 data/polkit-agent-1.pc
+gettext/Makefile
+gettext/its/Makefile
 src/Makefile
 src/polkit/Makefile
 src/polkitbackend/Makefile
@@ -581,6 +596,13 @@ echo "
         PAM support:                ${have_pam}
         systemdsystemunitdir:       ${systemdsystemunitdir}
         polkitd user:               ${POLKITD_USER}"
+if test "x${with_duktape}" = xyes; then
+echo "
+        Javascript engine:          Duktape"
+else
+echo "
+        Javascript engine:          Mozjs"
+fi
 
 if test "$have_pam" = yes ; then
 echo "
